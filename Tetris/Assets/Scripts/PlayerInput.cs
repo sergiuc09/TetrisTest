@@ -33,4 +33,9 @@ public class PlayerInput
     {
         return Input.GetKeyDown(KeyCode.DownArrow);
     }
+
+    public static bool DownPressing()
+    {
+        return Input.GetKey(KeyCode.DownArrow);
+    }
 }

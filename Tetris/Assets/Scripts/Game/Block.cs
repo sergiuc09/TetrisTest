@@ -58,7 +58,7 @@ public class Block : MonoBehaviour
         }
 
         //
-        if (Time.time - _prevTime > (PlayerInput.DownPressed() ? fallTime / 10 : fallTime))
+        if (Time.time - _prevTime > (PlayerInput.DownPressing() ? fallTime / 10 : fallTime))
         {
             if (CanMove(Vector3.down))
             {

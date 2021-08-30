@@ -35,6 +35,8 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
+        Camera.main.aspect = 1.777f;
+
         _grid = new Transform[_width, _height];
 
         _lengthBlocks = Blocks.Length;
