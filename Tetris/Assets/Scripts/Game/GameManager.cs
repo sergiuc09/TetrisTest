@@ -1,186 +1,122 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+[Serializable]
+public struct GameHUDData
+{
+    public BaseGameHUD GameType;
+    public BaseGameHUD Lines;
+    public BaseGameHUD TopScore;
+    public BaseGameHUD Score;
+    public BaseGameHUD Level;
+    public BaseGameHUD NextBlock;
+    public BaseGameHUD Statistics;
+}
+
 public class GameManager : MonoBehaviour
 {
-    public Transform SpawnPosition;
-    //public Block[] Blocks;
-    public BlockContainer[] Blocks;
-    public GameUI GameUI;
-    public MessageScript Message;
+    [SerializeField] private DeviceInput _deviceInput;
+    [SerializeField] private BoardView _boardView;
+    [SerializeField] private BoardData _boardData;
 
-    public Color[] ColorsBlocks;
+    [SerializeField] private Transform _spawnPosition;
 
-    //
-    private int _lengthBlocks = 0;
+    [SerializeField] private GameHUDData _gameHUDData;
 
-    private int _width = 10;
-    private int _height = 20;
-    private Transform[,] _grid;
-
-    public int Width => _width;
-    public int Height => _height;
-    public Transform[,] Grid => _grid;
-
-    private int _indexNext;
-    private int _indexColor;
+    [SerializeField] private GameUIData _gameUIData;
 
     //
-    private int _lines, _score, _level;
-    private int[] _blocksCount;
+    private Action OnDispose;
 
-    private bool is_paused = false;
-    private bool game_over = false;
+    private IBoardController _boardController;
 
     private void Awake()
     {
-        Camera.main.aspect = 1.777f;
+        IPlayerModel playerModel = new PlayerModel();
 
-        _grid = new Transform[_width, _height];
+        //
+        IDeviceInput deviceInput = (IDeviceInput)_deviceInput;
+        PlayerInput playerInput = new PlayerInput(deviceInput);
+        IBoardService boardService = new BoardService(playerModel, _boardData.blockDB.blocksPrefabs.Length);
+        IBoardView boardView = (IBoardView)_boardView;
 
-        _lengthBlocks = Blocks.Length;
-        _blocksCount = new int[_lengthBlocks];
+        // HUD Set's
+        _gameHUDData.GameType.SetValue(GameData.Instance.GameType);
+        _gameHUDData.Level.SetValue(GameData.Instance.Level);
+        _gameHUDData.TopScore.SetValue(playerModel.Score);
+
+        boardService.LinesChanged += _gameHUDData.Lines.SetValue;
+        boardService.ScoreChanged += _gameHUDData.Score.SetValue;
+        boardService.LevelChanged += _gameHUDData.Level.SetValue;
+        boardService.NextBlockGenerated += _gameHUDData.NextBlock.SetValue;
+        boardService.BlockStatisticUpdate += _gameHUDData.Statistics.SetValue;
+        boardView.ColorChanged += ((IColorChangeable)_gameHUDData.NextBlock).SetColor;
+        boardView.ColorChanged += ((IColorChangeable)_gameHUDData.Statistics).SetColor;
+
+        boardService.LevelChanged += boardView.OnLevelChanged;
+
+        boardView.Init(_boardData, _spawnPosition.position, playerInput, GameData.Instance.Level);
+        _boardController = 
+            new BoardController(boardView, boardService);
+
+        //
+        GameAction gameAction = new GameAction();
+        deviceInput.EnterPressed += gameAction.OnPaused;
+        boardView.GameOver += gameAction.OnGameOver;
+
+        new GameStateMachine(_gameUIData, gameAction);
+
+        //
+        AudioManager audioManager = FindObjectOfType<AudioManager>();
+        deviceInput.EnterPressed += audioManager.PlaySelection;
+        deviceInput.LeftPressed += audioManager.PlaySelection;
+        deviceInput.RightPressed += audioManager.PlaySelection;
+        deviceInput.UpPressed += audioManager.PlayBlockRotation;
+
+        boardView.BlockFalled += audioManager.PlayBlockFalled;
+        boardView.LinesRemove += audioManager.PlayLineRemove;
+        boardView.GameOver += audioManager.PlayGameOver;
+        //
+
+        OnDispose = () =>
+        {
+            ((IDisposable)playerInput)?.Dispose();
+            ((IDisposable)_boardController)?.Dispose();
+
+            boardService.LinesChanged -= _gameHUDData.Lines.SetValue;
+            boardService.ScoreChanged -= _gameHUDData.Score.SetValue;
+            boardService.LevelChanged -= _gameHUDData.Level.SetValue;
+            boardService.NextBlockGenerated -= _gameHUDData.NextBlock.SetValue;
+            boardService.BlockStatisticUpdate -= _gameHUDData.Statistics.SetValue;
+            boardView.ColorChanged -= ((IColorChangeable)_gameHUDData.NextBlock).SetColor;
+            boardView.ColorChanged -= ((IColorChangeable)_gameHUDData.Statistics).SetColor;
+
+            boardService.LevelChanged -= boardView.OnLevelChanged;
+
+            deviceInput.EnterPressed -= gameAction.OnPaused;
+            boardView.GameOver -= gameAction.OnGameOver;
+
+            // Audio listeners remove
+            deviceInput.EnterPressed -= audioManager.PlaySelection;
+            deviceInput.LeftPressed -= audioManager.PlaySelection;
+            deviceInput.RightPressed -= audioManager.PlaySelection;
+            deviceInput.UpPressed -= audioManager.PlayBlockRotation;
+
+            boardView.BlockFalled -= audioManager.PlayBlockFalled;
+            boardView.LinesRemove -= audioManager.PlayLineRemove;
+            boardView.GameOver -= audioManager.PlayGameOver;
+        };
     }
 
     private void Start()
     {
-        _level = GameData.level;
-
-        GameUI.SetGameType(GameData.gameType);
-        GameUI.SetLines(0);
-        GameUI.SetTopScore(GameData.topScore);
-        GameUI.SetScore(0);
-        GameUI.SetLevel(_level);
-
-        _indexNext = Random.Range(0, _lengthBlocks);
-        CreateNewBlock();
-
-        //
-        GameUI.SetBlocksColor(ColorsBlocks[_indexColor]);
+        _boardController.StartGame();
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        if(PlayerInput.EnterPressed())
-        {
-            AudioManager.Instance.PlaySelection();
-            if (game_over)
-                SceneLoader.Load(Scenes.Menu);
-            else if (is_paused)
-            {
-                is_paused = false;
-                Message.gameObject.SetActive(false);
-                Time.timeScale = 1;
-            }
-            else
-            {
-                is_paused = true;
-                Message.SetPause();
-                Time.timeScale = 0;
-            }
-        }
+        OnDispose?.Invoke();
     }
-
-    #region Public
-
-    public void CreateNewBlock()
-    {
-        _blocksCount[_indexNext]++;
-        GameUI.SetBlockCount(_indexNext, _blocksCount[_indexNext]);
-
-        Block block = Instantiate(Blocks[_indexNext].Prefab_Block, SpawnPosition.position, Quaternion.identity);
-        if (!block.Initialization(this, ColorsBlocks[_indexColor], _level))
-        {
-            Destroy(block.gameObject);
-            //print("Game Over!!!");
-            Message.SetGameover();
-            return;
-        }
-        _indexNext = Random.Range(0, Blocks.Length);
-        GameUI.SetNextBlock(Blocks[_indexNext].BlockUI, ColorsBlocks[_indexColor]);
-    }
-
-    public void ScoreIncrease()
-    {
-        _score += 12;
-        GameUI.SetScore(_score);
-    }
-
-    //
-    public void CheckForLines()
-    {
-        int count = 0;
-        for (int i = _height - 1; i >= 0; i--)
-        {
-            if (HasLine(i))
-            {
-                DeleteLine(i);
-                RowDown(i);
-
-                count++;
-
-                AudioManager.Instance.PlayLineRemove();
-            }
-        }
-
-        if (count > 0)
-        {
-            _lines += count;
-            GameUI.SetLines(_lines);
-            if (_lines % 10 == 0)
-            {
-                _level++;
-                GameUI.SetLevel(_level);
-
-                if (_indexColor < ColorsBlocks.Length - 1)
-                    _indexColor++;
-                else _indexColor = 0;
-                GameUI.SetBlocksColor(ColorsBlocks[_indexColor]);
-            }
-
-            //
-            _score += count * 300;
-            GameUI.SetScore(_score);
-        }
-    }
-
-    private bool HasLine(int i)
-    {
-        for (int j = 0; j < _width; j++)
-        {
-            if (_grid[j, i] == null)
-                return false;
-        }
-
-        return true;
-    }
-
-    private void DeleteLine(int i)
-    {
-        for (int j = 0; j < _width; j++)
-        {
-            Destroy(_grid[j, i].gameObject);
-            _grid[j, i] = null;
-        }
-    }
-
-    private void RowDown(int i)
-    {
-        for (int k = i; k < _height; k++)
-        {
-            for (int j = 0; j < _width; j++)
-            {
-                if (_grid[j, k] != null)
-                {
-                    _grid[j, k - 1] = _grid[j, k];
-                    _grid[j, k] = null;
-                    _grid[j, k - 1].transform.position -= new Vector3(0, 1, 0);
-                }
-            }
-        }
-    }
-
-    #endregion
 
 }
