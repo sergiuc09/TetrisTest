@@ -38,7 +38,8 @@ public class GameManager : MonoBehaviour
         //
         IDeviceInput deviceInput = (IDeviceInput)_deviceInput;
         PlayerInput playerInput = new PlayerInput(deviceInput);
-        IBoardService boardService = new BoardService(playerModel, _boardData.blockDB.blocksPrefabs.Length);
+        IBoardService boardService = new BoardService(
+            playerModel, _boardData.blockDB.blocksPrefabs.Length, GameData.Instance.Level);
         IBoardView boardView = (IBoardView)_boardView;
 
         // HUD Set's

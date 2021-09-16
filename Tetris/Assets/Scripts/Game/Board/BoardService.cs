@@ -12,8 +12,6 @@ public class BoardService : IBoardService
     public event Action<int> NextBlockGenerated;
     public event Action<int, int> BlockStatisticUpdate;
 
-    //private PlayerData _playerData;
-    //private DataSave<PlayerData> _playerDataSave;
     private IPlayerModel _playerModel;
 
     private int _lines, _score, _level;
@@ -25,12 +23,13 @@ public class BoardService : IBoardService
 
     private int[] _blocksCountStatistics;
 
-    public BoardService(IPlayerModel playerModel, int countBlocks)
+    public BoardService(IPlayerModel playerModel, int countBlocks, int level)
     {
-        _countBlocks = countBlocks;
-        _nextBlock = Random.Range(0, _countBlocks);
-
         _playerModel = playerModel;
+        _countBlocks = countBlocks;
+        _level = level;
+
+        _nextBlock = Random.Range(0, _countBlocks);
 
         _blocksCountStatistics = new int[_countBlocks];
         
@@ -41,7 +40,6 @@ public class BoardService : IBoardService
         _lines += value;
         LinesChanged?.Invoke(_lines);
 
-        //int count = _lines - (_lines % 10);
         int count = _lines / 10;
         count -= _level;
         if (count > 0)
@@ -71,7 +69,6 @@ public class BoardService : IBoardService
     private void IncreaseLevel(int value)
     {
         _level += value;
-        //IncreaseScore();
         LevelChanged?.Invoke(_level);
 
         _score += 100;

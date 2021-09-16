@@ -6,7 +6,7 @@ public interface IGameAction
 {
     event Action Paused;
     event Action GameOver;
-
+    
     void OnMenu();
     void OnReplay();
 }
@@ -18,7 +18,6 @@ public class GameAction : IGameAction
 
     public void OnMenu()
     {
-        //SceneLoader.Load(Scenes.Menu);
         LoadingScreen.Instance.LoadAsync(new List<ILoadingOperation>
         {
             new MenuLoadingOperation()
@@ -27,7 +26,6 @@ public class GameAction : IGameAction
 
     public void OnReplay()
     {
-        //SceneLoader.Load(Scenes.Game);
         LoadingScreen.Instance.LoadAsync(new List<ILoadingOperation>
         {
             new GameLoadingOperation()

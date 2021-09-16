@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,7 +13,6 @@ public struct BlockStatistic
 
 public class StatisticsHUD : BaseGameHUD, IColorChangeable
 {
-    //[SerializeField] private GameObject[] _blocks;
     [SerializeField] private BlockStatistic[] _blockStatistics;
 
     public override void SetValue(int index, int value)
@@ -23,6 +22,11 @@ public class StatisticsHUD : BaseGameHUD, IColorChangeable
 
     public void SetColor(Color color)
     {
+        StartCoroutine(ChangeColor(color));
+    }
+
+    private IEnumerator ChangeColor(Color color)
+    {
         for (int i = 0; i < _blockStatistics.Length; i++)
         {
             foreach (Transform child in _blockStatistics[i].block.transform)
@@ -31,6 +35,8 @@ public class StatisticsHUD : BaseGameHUD, IColorChangeable
                 if (img != null)
                     img.color = color;
             }
+
+            yield return null;
         }
     }
 
